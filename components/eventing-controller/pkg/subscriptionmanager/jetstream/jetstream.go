@@ -34,6 +34,7 @@ import (
 const (
 	subscriptionManagerName = "jetstream-subscription-manager"
 	jetstreamPVCPrefix      = "eventing-nats-js-pvc"
+	jetstreamPVCNamespace   = "kyma-system"
 )
 
 // AddToScheme adds all types of clientset and eventing into the given scheme.
@@ -175,7 +176,7 @@ func cleanup(backend handlers.JetStreamBackend, dynamicClient dynamic.Interface,
 	for _, v := range pvcs.Items {
 		pvc := v
 		if strings.Contains(pvc.Name, jetstreamPVCPrefix) {
-			if err := dynamicClient.Resource(handlers.PVCGroupVersionResource()).Namespace(corev1.NamespaceAll).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+			if err := dynamicClient.Resource(handlers.PVCGroupVersionResource()).Namespace(jetstreamPVCNamespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
 				isCleanupSuccessful = false
 				logger.Errorw("delete JetStream PVC failed", "pvc", pvc.Name, "error", err)
 			}

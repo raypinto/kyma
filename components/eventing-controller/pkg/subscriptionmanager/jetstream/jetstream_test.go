@@ -93,10 +93,10 @@ func TestCleanup(t *testing.T) {
 
 	// create test PVC
 	pvcName := fmt.Sprintf("%s-%s", jetstreamPVCPrefix, "test")
-	pvc := controllertesting.NewPVC(pvcName, "test")
+	pvc := controllertesting.NewPVC(pvcName, jetstreamPVCNamespace)
 	unstructuredPVC, err := controllertesting.NewUnstructured(pvc)
 	require.NoError(t, err)
-	_, err = jsSubMgr.Client.Resource(handlers.PVCGroupVersionResource()).Namespace("test").Create(ctx, unstructuredPVC, metav1.CreateOptions{})
+	_, err = jsSubMgr.Client.Resource(handlers.PVCGroupVersionResource()).Namespace(jetstreamPVCNamespace).Create(ctx, unstructuredPVC, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	cleaner := func(et string) (string, error) {
@@ -146,8 +146,8 @@ func TestCleanup(t *testing.T) {
 	require.Equal(t, wantSubStatus, gotSub.Status)
 
 	// verify that the pvc is deleted
-	_, err = jsSubMgr.Client.Resource(handlers.PVCGroupVersionResource()).Namespace("test").Get(ctx, pvcName, metav1.GetOptions{})
-	require.EqualError(t, err, fmt.Sprintf("persistentvolumeclaims %s not found", pvcName))
+	_, err = jsSubMgr.Client.Resource(handlers.PVCGroupVersionResource()).Namespace(jetstreamPVCNamespace).Get(ctx, pvcName, metav1.GetOptions{})
+	require.EqualError(t, err, fmt.Sprintf("persistentvolumeclaims %q not found", pvcName))
 
 	// test JetStream subscriptions/consumers are gone
 	info, err = jsClient.StreamInfo(envConf.JSStreamName)
