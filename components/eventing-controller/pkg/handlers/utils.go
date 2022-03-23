@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	"math/rand"
 	"net/url"
 	"strings"
@@ -288,6 +289,19 @@ func ToSubscriptionList(unstructuredList *unstructured.UnstructuredList) (*event
 	return subscriptionList, nil
 }
 
+func ToPVCList(unstructuredList *unstructured.UnstructuredList) (*v1.PersistentVolumeClaimList, error) {
+	pvcList := new(v1.PersistentVolumeClaimList)
+	pvcListBytes, err := unstructuredList.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(pvcListBytes, pvcList)
+	if err != nil {
+		return nil, err
+	}
+	return pvcList, nil
+}
+
 func toUnstructuredSub(sub *eventingv1alpha1.Subscription) (*unstructured.Unstructured, error) {
 	object, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(&sub)
 	if err != nil {
@@ -309,5 +323,13 @@ func APIRuleGroupVersionResource() schema.GroupVersionResource {
 		Version:  apigatewayv1alpha1.GroupVersion.Version,
 		Group:    apigatewayv1alpha1.GroupVersion.Group,
 		Resource: "apirules",
+	}
+}
+
+func PVCGroupVersionResource() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Version:  "v1",
+		Group:    "",
+		Resource: "persistentvolumeclaims",
 	}
 }

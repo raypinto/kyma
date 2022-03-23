@@ -651,6 +651,25 @@ func NewFakeSubscriptionClient(sub *eventingv1alpha1.Subscription) (dynamic.Inte
 	return dynamicClient, nil
 }
 
+func NewPVC(name, namespace string) *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+func NewUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+	u := &unstructured.Unstructured{}
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+	u.Object = unstructuredObj
+	return u, nil
+}
+
 func GetStructuredMessageHeaders() http.Header {
 	return http.Header{"Content-Type": []string{"application/cloudevents+json"}}
 }

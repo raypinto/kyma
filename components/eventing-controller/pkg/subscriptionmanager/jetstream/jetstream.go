@@ -3,6 +3,11 @@ package jetstream
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"strings"
 	"time"
 
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/handlers/sink"
@@ -28,6 +33,7 @@ import (
 
 const (
 	subscriptionManagerName = "jetstream-subscription-manager"
+	jetstreamPVCPrefix      = "eventing-nats-js-pvc"
 )
 
 // AddToScheme adds all types of clientset and eventing into the given scheme.
@@ -102,9 +108,83 @@ func (sm *SubscriptionManager) Start(defaultSubsConfig env.DefaultSubscriptionCo
 	return nil
 }
 
-func (sm *SubscriptionManager) Stop(_ bool) error {
+func (sm *SubscriptionManager) Stop(runCleanup bool) error {
 	sm.cancel()
-	sm.namedLogger().Info("stopped JetStream subscription manager")
+	if !runCleanup {
+		return nil
+	}
+	dynamicClient := dynamic.NewForConfigOrDie(sm.restCfg)
+	return cleanup(sm.backend, dynamicClient, sm.namedLogger())
+}
+
+// clean removes all JetStream artifacts.
+func cleanup(backend handlers.JetStreamBackend, dynamicClient dynamic.Interface, logger *zap.SugaredLogger) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var ok bool
+	var jsBackend *handlers.JetStream
+	if jsBackend, ok = backend.(*handlers.JetStream); !ok {
+		err := errors.New("convert backend handler to JetStream handler failed")
+		logger.Errorw("no JetStream backend exists", "error", err)
+		return err
+	}
+
+	// fetch all subscriptions.
+	subscriptionsUnstructured, err := dynamicClient.Resource(handlers.SubscriptionGroupVersionResource()).Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "list subscriptions failed")
+	}
+
+	subs, err := handlers.ToSubscriptionList(subscriptionsUnstructured)
+	if err != nil {
+		return errors.Wrapf(err, "convert subscriptionList from unstructured list failed")
+	}
+
+	// clean all status.
+	isCleanupSuccessful := true
+	for _, v := range subs.Items {
+		sub := v
+		subKey := types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}
+		log := logger.With("key", subKey.String())
+
+		desiredSub := handlers.RemoveStatus(sub)
+		if err := handlers.UpdateSubscriptionStatus(ctx, dynamicClient, desiredSub); err != nil {
+			isCleanupSuccessful = false
+			log.Errorw("update NATS subscription status failed", "error", err)
+		}
+
+		// clean subscriptions from JetStream.
+		if jsBackend != nil {
+			if err := jsBackend.DeleteSubscription(&sub); err != nil {
+				isCleanupSuccessful = false
+				log.Errorw("delete JetStream subscription failed", "error", err)
+			}
+		}
+	}
+
+	// delete the PVC for JetStream file storage
+	pvcUnstructured, err := dynamicClient.Resource(handlers.PVCGroupVersionResource()).Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "list pvc's failed")
+	}
+	pvcs, err := handlers.ToPVCList(pvcUnstructured)
+	if err != nil {
+		return errors.Wrapf(err, "convert pvcList from unstructured list failed")
+	}
+	for _, v := range pvcs.Items {
+		pvc := v
+		if strings.Contains(pvc.Name, jetstreamPVCPrefix) {
+			if err := dynamicClient.Resource(handlers.PVCGroupVersionResource()).Namespace(corev1.NamespaceAll).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+				isCleanupSuccessful = false
+				logger.Errorw("delete JetStream PVC failed", "pvc", pvc.Name, "error", err)
+			}
+		}
+	}
+
+	// delete the stream
+
+	logger.Debugw("cleanup process finished", "success", isCleanupSuccessful)
 	return nil
 }
 

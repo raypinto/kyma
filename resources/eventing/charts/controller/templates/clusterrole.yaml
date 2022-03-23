@@ -9,6 +9,7 @@ rules:
   resources:
   - services
   - pods
+  - persistentvolumeclaims
   verbs:
   - list
   - get

@@ -72,9 +72,9 @@ spec:
           - name: APP_LOG_LEVEL
             value: "debug"
           - name: ENABLE_JETSTREAM_BACKEND
-            value: "false"
+            value: "true"
           - name: JS_STREAM_STORAGE_TYPE
-            value: "memory"
+            value: "file"
           - name: JS_STREAM_NAME
             value: "sap"
         resources:
