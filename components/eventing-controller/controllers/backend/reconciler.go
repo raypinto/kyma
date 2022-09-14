@@ -108,6 +108,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.Result
 	// if something breaks during reconciliation, the condition and eventingReady is updated to false.
 	defaultStatus := getDefaultBackendStatus()
 
+	// Test commit
+
 	if err := r.List(ctx, &secretList, client.MatchingLabels{
 		BEBBackendSecretLabelKey: BEBBackendSecretLabelValue,
 	}); err != nil {
