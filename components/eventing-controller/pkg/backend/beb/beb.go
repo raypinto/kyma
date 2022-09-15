@@ -125,11 +125,8 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 	// define flag to track if status is updated
 	var statusChanged = false
 
-	// deduplicate event types
-	uniqueTypes := subscription.GetUniqueTypes()
-	// clean event types
-	// append any required prefixes
-	typesInfo, err := b.getProcessedEventTypes(uniqueTypes, cleaner)
+	// process event types
+	typesInfo, err := b.GetProcessedEventTypes(subscription, cleaner)
 	if err != nil {
 		log.Errorw("Failed to process types", ErrorLogKey, err)
 		return false, err
@@ -208,11 +205,12 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 
 	// Update status.types
 	subscription.Status.Types = statusCleanEventTypes(typesInfo)
-	subscription.Status.Backend.Types = statusFinalEventTypes(typesInfo)
 
 	// Update status.backend.types
 	// @TODO: check where to put this information in status, the EventMesh subject
 	// would be different from cleaned type because we add prefix
+	// for testing, putting it in backend.types
+	subscription.Status.Backend.Types = statusFinalEventTypes(typesInfo)
 
 	// Update hashes in status
 	if err = b.updateHashesInStatus(subscription, eventMeshSub, eventMeshServerSub); err != nil {
@@ -231,25 +229,37 @@ func (b *BEB) DeleteSubscription(subscription *eventingv1alpha2.Subscription) er
 	return b.deleteSubscription(b.SubNameMapper.MapSubscriptionName(subscription))
 }
 
-// getProcessedEventTypes returns the processed types after cleaning and prefixing.
-func (b *BEB) getProcessedEventTypes(types []string, cleaner eventtype.Cleaner) ([]backendutils.EventTypeInfo, error) {
-	result := make([]backendutils.EventTypeInfo, 0, len(types))
-	for _, t := range types {
+// GetProcessedEventTypes returns the processed types after cleaning and prefixing as required by EventMesh specifications.
+func (b *BEB) GetProcessedEventTypes(kymaSubscription *eventingv1alpha2.Subscription, cleaner eventtype.Cleaner) ([]backendutils.EventTypeInfo, error) {
+	// deduplicate event types
+	uniqueTypes := kymaSubscription.GetUniqueTypes()
+
+	// process types including cleaning, appending prefixes
+	result := make([]backendutils.EventTypeInfo, 0, len(uniqueTypes))
+	for _, t := range uniqueTypes {
+		if kymaSubscription.Spec.TypeMatching == eventingv1alpha2.EXACT {
+			// not do any processing if TypeMatching is exact.
+			result = append(result, backendutils.EventTypeInfo{OriginalType: t, CleanType: t, ProcessedType: t})
+			continue
+		}
+
+		// clean type and source
+		cleanedSource := kymaSubscription.Spec.Source // @TODO: clean
 		cleanedType, err := cleaner.Clean(t)
 		if err != nil {
 			return nil, err
 		}
-
-		result = append(result, backendutils.EventTypeInfo{OriginalType: t, CleanType: cleanedType, ProcessedType: b.GetEventMeshSubject(cleanedType)})
+		eventMeshSubject := b.GetEventMeshSubject(cleanedSource, cleanedType)
+		result = append(result, backendutils.EventTypeInfo{OriginalType: t, CleanType: cleanedType, ProcessedType: eventMeshSubject})
 	}
 
 	return result, nil
 }
 
 // GetEventMeshSubject appends the prefix to subject.
-func (b *BEB) GetEventMeshSubject(subject string) string {
+func (b *BEB) GetEventMeshSubject(source, subject string) string {
 	// @TODO: Update it to use event type prefix and source
-	return fmt.Sprintf("%s.%s", "sap.kyma.custom", subject)
+	return fmt.Sprintf("%s.%s.%s", "sap.kyma.custom", source, subject)
 }
 
 func (b *BEB) updateHashesInStatus(kymaSubscription *eventingv1alpha2.Subscription, eventMeshLocalSubscription *types.Subscription, eventMeshServerSubscription *types.Subscription) error {
