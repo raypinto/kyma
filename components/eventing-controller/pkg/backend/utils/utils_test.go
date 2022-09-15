@@ -218,7 +218,7 @@ func TestConvertKymaSubToEventMeshSub(t *testing.T) {
 	})
 }
 
-func TestGetInternalView4Ems(t *testing.T) {
+func TestGetCleanedEventMeshSubscription(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	// given
@@ -238,7 +238,7 @@ func TestGetInternalView4Ems(t *testing.T) {
 	}
 
 	// then
-	bebSubscription := GetInternalView4Ems(emsSubscription)
+	bebSubscription := GetCleanedEventMeshSubscription(emsSubscription)
 
 	// when
 	g.Expect(bebSubscription.Name).To(BeEquivalentTo(emsSubscription.Name))

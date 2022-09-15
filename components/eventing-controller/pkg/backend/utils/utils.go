@@ -227,7 +227,7 @@ func getExposedURLFromAPIRule(apiRule *apigatewayv1beta1.APIRule, sub *eventingv
 	return fmt.Sprintf("%s%s%s", scheme, *apiRule.Spec.Host, path), nil
 }
 
-func GetInternalView4Ems(subscription *types.Subscription) *types.Subscription {
+func GetCleanedEventMeshSubscription(subscription *types.Subscription) *types.Subscription {
 	eventMeshSubscription := &types.Subscription{}
 
 	// Name

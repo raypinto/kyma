@@ -171,13 +171,13 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 
 	if eventMeshServerSub != nil {
 		// get the internal view for the EMS subscription
-		sEms := backendutils.GetInternalView4Ems(eventMeshServerSub)
-		newEmsHash, err := backendutils.GetHash(sEms)
+		cleanedEventMeshServerSub := backendutils.GetCleanedEventMeshSubscription(eventMeshServerSub)
+		isEventMeshServerSubModified, err := backendutils.IsEventMeshSubModified(cleanedEventMeshServerSub, subscription.Status.Backend.Emshash)
 		if err != nil {
-			log.Errorw("Failed to get BEB subscription hash", ErrorLogKey, err)
 			return false, err
 		}
-		if newEmsHash != subscription.Status.Backend.Emshash {
+
+		if isEventMeshServerSubModified {
 			// delete subscription from EventMesh server
 			if err := b.deleteSubscription(subscription.Name); err != nil {
 				log.Errorw("Failed to delete subscription on EventMesh", ErrorLogKey, err)
@@ -288,7 +288,7 @@ func (b *BEB) setEventMeshLocalSubHashInStatus(kymaSubscription *eventingv1alpha
 // setEventMeshServerSubHashInStatus sets the hash for EventMesh local sub in Kyma Sub status.
 func (b *BEB) setEventMeshServerSubHashInStatus(kymaSubscription *eventingv1alpha2.Subscription, eventMeshSubscription *types.Subscription) error {
 	// clean up the server sub object from extra info
-	cleanedEventMeshSub := backendutils.GetInternalView4Ems(eventMeshSubscription)
+	cleanedEventMeshSub := backendutils.GetCleanedEventMeshSubscription(eventMeshSubscription)
 	// generate hash
 	newHash, err := backendutils.GetHash(cleanedEventMeshSub)
 	if err != nil {
