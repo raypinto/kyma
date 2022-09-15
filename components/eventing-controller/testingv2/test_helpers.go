@@ -32,6 +32,7 @@ const (
 	ApplicationName         = "testapp1023"
 	ApplicationNameNotClean = "test-app_1-0+2=3"
 
+	EventMeshNamespace 						 = "/default/kyma/id"
 	EventSource                              = "/default/kyma/id"
 	EventTypePrefix                          = "prefix"
 	EventTypePrefixEmpty                     = ""
@@ -388,6 +389,10 @@ func WithOrderCreatedFilter() SubscriptionOpt {
 
 func WithSinkMissingScheme(svcNamespace, svcName string) SubscriptionOpt {
 	return WithSinkURL(fmt.Sprintf("%s.%s.svc.cluster.local", svcName, svcNamespace))
+}
+
+func WithDefaultSource() SubscriptionOpt {
+	return WithEventSource(ApplicationName)
 }
 
 // WithValidSink is a SubscriptionOpt for creating a subscription with a valid sink that itself gets created from

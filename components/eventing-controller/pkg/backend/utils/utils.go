@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"math/rand"
 	"net/url"
 	"strings"
@@ -46,6 +47,16 @@ type EventTypeInfo struct {
 type bebSubscriptionNameMapper struct {
 	domainName string
 	maxLength  int
+}
+
+// LoggerWithSubscription returns a logger with the given subscription details.
+func LoggerWithSubscription(log *zap.SugaredLogger, subscription *eventingv1alpha2.Subscription) *zap.SugaredLogger {
+	return log.With(
+		"kind", subscription.GetObjectKind().GroupVersionKind().Kind,
+		"version", subscription.GetGeneration(),
+		"namespace", subscription.GetNamespace(),
+		"name", subscription.GetName(),
+	)
 }
 
 func NewBEBSubscriptionNameMapper(domainName string, maxNameLength int) NameMapper {
@@ -153,7 +164,7 @@ func ConvertKymaSubToEventMeshSub(subscription *eventingv1alpha2.Subscription, t
 	// set the event types in EventMesh subscription instance
 
 	eventMeshNamespace := defaultNamespace
-	if subscription.Spec.TypeMatching == "Exact" {
+	if subscription.Spec.TypeMatching == eventingv1alpha2.EXACT {
 		eventMeshNamespace = subscription.Spec.Source
 	}
 

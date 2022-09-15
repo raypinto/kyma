@@ -18,7 +18,6 @@ import (
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/auth"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/httpclient"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/env"
-	"github.com/kyma-project/kyma/components/eventing-controller/utils"
 )
 
 const (
@@ -121,7 +120,7 @@ func getWebHookAuth(cfg env.Config, credentials *OAuth2ClientCredentials) *types
 // SyncSubscription synchronize the EV2 subscription with the EMS subscription. It returns true, if the EV2 subscription status was changed.
 func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, cleaner eventtype.Cleaner, apiRule *apigatewayv1beta1.APIRule) (bool, error) {
 	// Format logger
-	log := utils.LoggerWithSubscriptionV1Alpha2(b.namedLogger(), subscription)
+	log := backendutils.LoggerWithSubscription(b.namedLogger(), subscription)
 
 	// define flag to track if status is updated
 	var statusChanged = false

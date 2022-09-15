@@ -48,8 +48,9 @@ func TestConvertKymaSubToEventMeshSub(t *testing.T) {
 	defaultNameMapper := NewBEBSubscriptionNameMapper("my-shoot", 50)
 
 	bebSubEvents := types.Events{types.Event{
-		Source: eventingtesting.EventSource,
-		Type:   eventingtesting.OrderCreatedEventType,
+		Source: eventingtesting.EventMeshNamespace,
+		//Type:   eventingtesting.OrderCreatedEventType,
+		Type: "prefix.testapp1023.order.created.v1", // @TODO: update it once cleaner logic is finalized
 	}}
 
 	// getProcessedEventTypes returns the processed types after cleaning and prefixing.
@@ -61,7 +62,7 @@ func TestConvertKymaSubToEventMeshSub(t *testing.T) {
 		return result
 	}
 
-	defaultNamespace := "defaultNS"
+	defaultNamespace := eventingtesting.EventMeshNamespace
 	svcName := "foo-svc"
 	host := "foo-host"
 	scheme := "https"
@@ -71,6 +72,7 @@ func TestConvertKymaSubToEventMeshSub(t *testing.T) {
 	t.Run("subscription with protocol settings where defaults are overridden", func(t *testing.T) {
 		// given
 		subscription := eventingtesting.NewSubscription("name", "namespace",
+			eventingtesting.WithDefaultSource(),
 			eventingtesting.WithOrderCreatedFilter(),
 			eventingtesting.WithValidSink("ns", svcName),
 		)
@@ -106,7 +108,7 @@ func TestConvertKymaSubToEventMeshSub(t *testing.T) {
 		)
 
 		// then
-		gotBEBSubscription, err := ConvertKymaSubToEventMeshSub(subscription, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, "", defaultNameMapper)
+		gotBEBSubscription, err := ConvertKymaSubToEventMeshSub(subscription, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
 
 		// when
 		g.Expect(err).To(BeNil())

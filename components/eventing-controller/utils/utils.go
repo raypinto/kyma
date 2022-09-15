@@ -6,10 +6,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
-
-	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
-	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 )
 
 // GetPortNumberFromURL converts string port from url.URL to uint32 port.
@@ -76,24 +72,4 @@ func BoolPtrEqual(b1, b2 *bool) bool {
 	}
 
 	return false
-}
-
-// LoggerWithSubscription returns a logger with the given subscription details.
-func LoggerWithSubscription(log *zap.SugaredLogger, subscription *eventingv1alpha1.Subscription) *zap.SugaredLogger {
-	return log.With(
-		"kind", subscription.GetObjectKind().GroupVersionKind().Kind,
-		"version", subscription.GetGeneration(),
-		"namespace", subscription.GetNamespace(),
-		"name", subscription.GetName(),
-	)
-}
-
-// LoggerWithSubscriptionV1Alpha2 returns a logger with the given subscription details.
-func LoggerWithSubscriptionV1Alpha2(log *zap.SugaredLogger, subscription *eventingv1alpha2.Subscription) *zap.SugaredLogger {
-	return log.With(
-		"kind", subscription.GetObjectKind().GroupVersionKind().Kind,
-		"version", subscription.GetGeneration(),
-		"namespace", subscription.GetNamespace(),
-		"name", subscription.GetName(),
-	)
 }
