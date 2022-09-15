@@ -37,9 +37,9 @@ type NameMapper interface {
 }
 
 type EventTypeInfo struct {
-	OriginalType string
-	CleanType    string
-	ProcessedType	 string
+	OriginalType  string
+	CleanType     string
+	ProcessedType string
 }
 
 // bebSubscriptionNameMapper maps a Kyma subscription to an ID that can be used on the BEB backend,

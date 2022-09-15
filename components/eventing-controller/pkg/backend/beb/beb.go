@@ -126,7 +126,7 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 	var statusChanged = false
 
 	// deduplicate event types
-	uniqueTypes := subscription.GetUniqueTypes();
+	uniqueTypes := subscription.GetUniqueTypes()
 	// clean event types
 	// append any required prefixes
 	typesInfo, err := b.getProcessedEventTypes(uniqueTypes, cleaner)

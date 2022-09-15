@@ -32,7 +32,7 @@ const (
 	ApplicationName         = "testapp1023"
 	ApplicationNameNotClean = "test-app_1-0+2=3"
 
-	EventMeshNamespace 						 = "/default/kyma/id"
+	EventMeshNamespace                       = "/default/kyma/id"
 	EventSource                              = "/default/kyma/id"
 	EventTypePrefix                          = "prefix"
 	EventTypePrefixEmpty                     = ""
