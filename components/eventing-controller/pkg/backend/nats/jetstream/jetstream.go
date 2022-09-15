@@ -155,7 +155,7 @@ func (js *JetStream) SyncSubscription(subscription *eventingv1alpha2.Subscriptio
 		return err
 	}
 
-	if err := js.syncSubscriptionFilters(subscription, log); err != nil {
+	if err := js.syncSubscriptionTypes(subscription, log); err != nil {
 		return err
 	}
 
@@ -326,10 +326,10 @@ func getStreamConfig(natsConfig env.NatsConfig) (*nats.StreamConfig, error) {
 	return streamConfig, nil
 }
 
-// syncSubscriptionFilters syncs the Kyma subscription filters with NATS subscriptions.
-func (js *JetStream) syncSubscriptionFilters(subscription *eventingv1alpha2.Subscription, log *zap.SugaredLogger) error {
+// syncSubscriptionTypes syncs the Kyma subscription types with NATS subscriptions.
+func (js *JetStream) syncSubscriptionTypes(subscription *eventingv1alpha2.Subscription, log *zap.SugaredLogger) error {
 	for key, jsSub := range js.subscriptions {
-		err := js.syncSubscriptionFilter(key, subscription, jsSub, log)
+		err := js.syncSubscriptionType(key, subscription, jsSub, log)
 		if err != nil {
 			return err
 		}
@@ -337,7 +337,7 @@ func (js *JetStream) syncSubscriptionFilters(subscription *eventingv1alpha2.Subs
 	return nil
 }
 
-func (js *JetStream) syncSubscriptionFilter(key SubscriptionSubjectIdentifier, subscription *eventingv1alpha2.Subscription, subscriber backendnats.Subscriber, log *zap.SugaredLogger) error {
+func (js *JetStream) syncSubscriptionType(key SubscriptionSubjectIdentifier, subscription *eventingv1alpha2.Subscription, subscriber backendnats.Subscriber, log *zap.SugaredLogger) error {
 	if !js.isJsSubAssociatedWithKymaSub(key, subscription) || !subscriber.IsValid() {
 		return nil
 	}
@@ -370,7 +370,7 @@ func (js *JetStream) cleanupUnnecessaryJetStreamSubscribers(jsSub backendnats.Su
 		return nil
 	}
 	log.Infow(
-		"Deleting JetStream subscription because it was deleted from subscription filters",
+		"Deleting JetStream subscription because it was deleted from subscription types",
 		"subscriptionSubject", key,
 		"jetStreamSubject", jsSub.SubscriptionSubject(),
 	)
@@ -452,7 +452,7 @@ func (js *JetStream) createConsumer(subscription *eventingv1alpha2.Subscription,
 	return nil
 }
 
-// checkNATSSubscriptionsCount checks whether NATS Subscription(s) were created for all the Kyma Subscription filters
+// checkNATSSubscriptionsCount checks whether NATS Subscription(s) were created for all the Kyma Subscription types
 func (js *JetStream) checkNATSSubscriptionsCount(subscription *eventingv1alpha2.Subscription) error {
 	for _, subject := range subscription.Status.Types {
 		jsSubject := js.GetJetStreamSubject(subject.CleanType)
