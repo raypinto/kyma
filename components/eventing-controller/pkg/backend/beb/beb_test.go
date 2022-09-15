@@ -6,12 +6,12 @@ import (
 	kymalogger "github.com/kyma-project/kyma/common/logging/logger"
 	. "github.com/onsi/gomega"
 
-	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
+	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"github.com/kyma-project/kyma/components/eventing-controller/logger"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/backend/utils"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/api/events/types"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/env"
-	controllertesting "github.com/kyma-project/kyma/components/eventing-controller/testing"
+	controllertesting "github.com/kyma-project/kyma/components/eventing-controller/testingv2"
 )
 
 func Test_SyncBEBSubscription(t *testing.T) {
@@ -48,8 +48,8 @@ func Test_SyncBEBSubscription(t *testing.T) {
 
 	// when
 	subscription := fixtureValidSubscription("some-name", "some-namespace")
-	subscription.Status.Emshash = 0
-	subscription.Status.Ev2hash = 0
+	subscription.Status.Backend.Emshash = 0
+	subscription.Status.Backend.Ev2hash = 0
 
 	apiRule := controllertesting.NewAPIRule(subscription,
 		controllertesting.WithPath(),
@@ -64,11 +64,12 @@ func Test_SyncBEBSubscription(t *testing.T) {
 }
 
 // fixtureValidSubscription returns a valid subscription.
-func fixtureValidSubscription(name, namespace string) *eventingv1alpha1.Subscription {
+func fixtureValidSubscription(name, namespace string) *eventingv1alpha2.Subscription {
 	return controllertesting.NewSubscription(
 		name, namespace,
 		controllertesting.WithSinkURL("https://webhook.xxx.com"),
-		controllertesting.WithFilter(controllertesting.EventSource, controllertesting.OrderCreatedEventTypeNotClean),
+		controllertesting.WithDefaultSource(),
+		controllertesting.WithEventType(controllertesting.OrderCreatedEventTypeNotClean),
 		controllertesting.WithWebhookAuthForBEB(),
 	)
 }

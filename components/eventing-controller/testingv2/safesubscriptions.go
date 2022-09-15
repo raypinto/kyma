@@ -1,4 +1,4 @@
-package testing
+package testingv2
 
 import (
 	"strings"
