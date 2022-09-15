@@ -2,6 +2,7 @@ package v1alpha2
 
 import (
 	"encoding/json"
+	"github.com/kyma-project/kyma/components/eventing-controller/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -82,6 +83,18 @@ func (s Subscription) MarshalJSON() ([]byte, error) {
 		a.Status.InitializeCleanEventTypes()
 	}
 	return json.Marshal(a)
+}
+
+// GetUniqueTypes returns the de-duplicated types from subscription spec.
+func (s *Subscription) GetUniqueTypes() []string {
+	result := make([]string, 0, len(s.Spec.Types))
+	for _, t := range s.Spec.Types {
+		if !utils.ContainsString(result, t) {
+			result = append(result, t)
+		}
+	}
+
+	return result
 }
 
 // InitializeCleanEventTypes initializes the SubscriptionStatus.CleanEventTypes with an empty slice of strings.

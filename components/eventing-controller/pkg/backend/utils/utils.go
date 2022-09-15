@@ -22,7 +22,7 @@ import (
 
 	apigatewayv1beta1 "github.com/kyma-incubator/api-gateway/api/v1beta1"
 
-	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
+	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/api/events/types"
 )
 
@@ -32,7 +32,13 @@ const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 // (external) systems, e.g. on different eventing backends, the same Kyma subscription name
 // could map to a different name.
 type NameMapper interface {
-	MapSubscriptionName(sub *eventingv1alpha1.Subscription) string
+	MapSubscriptionName(sub *eventingv1alpha2.Subscription) string
+}
+
+type EventTypeInfo struct {
+	OriginalType string
+	CleanType    string
+	ProcessedType	 string
 }
 
 // bebSubscriptionNameMapper maps a Kyma subscription to an ID that can be used on the BEB backend,
@@ -49,7 +55,7 @@ func NewBEBSubscriptionNameMapper(domainName string, maxNameLength int) NameMapp
 	}
 }
 
-func (m *bebSubscriptionNameMapper) MapSubscriptionName(sub *eventingv1alpha1.Subscription) string {
+func (m *bebSubscriptionNameMapper) MapSubscriptionName(sub *eventingv1alpha2.Subscription) string {
 	hash := hashSubscriptionFullName(m.domainName, sub.Namespace, sub.Name)
 	return shortenNameAndAppendHash(sub.Name, hash, m.maxLength)
 }
@@ -87,7 +93,7 @@ func GetHash(subscription *types.Subscription) (int64, error) {
 	return int64(hash), nil
 }
 
-func getDefaultSubscription(protocolSettings *eventingv1alpha1.ProtocolSettings) (*types.Subscription, error) {
+func getDefaultSubscription(protocolSettings *eventingv1alpha2.ProtocolSettings) (*types.Subscription, error) {
 	emsSubscription := &types.Subscription{}
 	emsSubscription.ContentMode = *protocolSettings.ContentMode
 	emsSubscription.ExemptHandshake = *protocolSettings.ExemptHandshake
@@ -111,24 +117,27 @@ func getQos(qosStr string) (types.Qos, error) {
 	}
 }
 
-func GetInternalView4Ev2(subscription *eventingv1alpha1.Subscription, apiRule *apigatewayv1beta1.APIRule,
-	defaultWebhookAuth *types.WebhookAuth, defaultProtocolSettings *eventingv1alpha1.ProtocolSettings,
+func GetInternalView4Ev2(subscription *eventingv1alpha2.Subscription, typeInfos []EventTypeInfo, apiRule *apigatewayv1beta1.APIRule,
+	defaultWebhookAuth *types.WebhookAuth, defaultProtocolSettings *eventingv1alpha2.ProtocolSettings,
 	defaultNamespace string, nameMapper NameMapper) (*types.Subscription, error) {
-	emsSubscription, err := getDefaultSubscription(defaultProtocolSettings)
+
+	// get default EventMesh subscription object
+	eventMeshSubscription, err := getDefaultSubscription(defaultProtocolSettings)
 	if err != nil {
 		return nil, errors.Wrap(err, "apply default protocol settings failed")
 	}
-	// Name
-	emsSubscription.Name = nameMapper.MapSubscriptionName(subscription)
+	// set Name of EventMesh subscription
+	eventMeshSubscription.Name = nameMapper.MapSubscriptionName(subscription)
 
-	// Applying protocol settings if provided in subscription CR
+	// @TODO: Check how the protocol settings would work in new CRD
+	//// Applying protocol settings if provided in subscription CR
 	if subscription.Spec.ProtocolSettings != nil {
 		if subscription.Spec.ProtocolSettings.ContentMode != nil {
-			emsSubscription.ContentMode = *subscription.Spec.ProtocolSettings.ContentMode
+			eventMeshSubscription.ContentMode = *subscription.Spec.ProtocolSettings.ContentMode
 		}
 		// ExemptHandshake
 		if subscription.Spec.ProtocolSettings.ExemptHandshake != nil {
-			emsSubscription.ExemptHandshake = *subscription.Spec.ProtocolSettings.ExemptHandshake
+			eventMeshSubscription.ExemptHandshake = *subscription.Spec.ProtocolSettings.ExemptHandshake
 		}
 		// Qos
 		if subscription.Spec.ProtocolSettings.Qos != nil {
@@ -136,30 +145,33 @@ func GetInternalView4Ev2(subscription *eventingv1alpha1.Subscription, apiRule *a
 			if err != nil {
 				return nil, err
 			}
-			emsSubscription.Qos = qos
+			eventMeshSubscription.Qos = qos
 		}
 	}
 
+	// Events
+	// set the event types in EventMesh subscription instance
+
+	eventMeshNamespace := defaultNamespace
+	if subscription.Spec.TypeMatching == "Exact" {
+		eventMeshNamespace = subscription.Spec.Source
+	}
+
+	for _, typeInfo := range typeInfos {
+		eventType := typeInfo.ProcessedType
+		if subscription.Spec.TypeMatching == eventingv1alpha2.EXACT {
+			eventType = typeInfo.OriginalType
+		}
+		eventMeshSubscription.Events = append(eventMeshSubscription.Events, types.Event{Source: eventMeshNamespace, Type: eventType})
+	}
+
 	// WebhookURL
+	// set WebhookURL of EventMesh subscription where the events will be dispatched to.
 	urlTobeRegistered, err := getExposedURLFromAPIRule(apiRule, subscription)
 	if err != nil {
 		return nil, errors.Wrap(err, "get APIRule exposed URL failed")
 	}
-	emsSubscription.WebhookURL = urlTobeRegistered
-
-	// Events
-	uniqueFilters, err := subscription.Spec.Filter.Deduplicate()
-	if err != nil {
-		return nil, errors.Wrap(err, "deduplicate subscription filters failed")
-	}
-	for _, e := range uniqueFilters.Filters {
-		s := defaultNamespace
-		if e.EventSource.Value != "" {
-			s = e.EventSource.Value
-		}
-		t := e.EventType.Value
-		emsSubscription.Events = append(emsSubscription.Events, types.Event{Source: s, Type: t})
-	}
+	eventMeshSubscription.WebhookURL = urlTobeRegistered
 
 	// Using default webhook auth unless specified in Subscription CR
 	auth := defaultWebhookAuth
@@ -179,11 +191,11 @@ func GetInternalView4Ev2(subscription *eventingv1alpha1.Subscription, apiRule *a
 		}
 		auth.TokenURL = subscription.Spec.ProtocolSettings.WebhookAuth.TokenURL
 	}
-	emsSubscription.WebhookAuth = auth
-	return emsSubscription, nil
+	eventMeshSubscription.WebhookAuth = auth
+	return eventMeshSubscription, nil
 }
 
-func getExposedURLFromAPIRule(apiRule *apigatewayv1beta1.APIRule, sub *eventingv1alpha1.Subscription) (string, error) {
+func getExposedURLFromAPIRule(apiRule *apigatewayv1beta1.APIRule, sub *eventingv1alpha2.Subscription) (string, error) {
 	scheme := "https://"
 	path := ""
 
@@ -205,27 +217,38 @@ func getExposedURLFromAPIRule(apiRule *apigatewayv1beta1.APIRule, sub *eventingv
 }
 
 func GetInternalView4Ems(subscription *types.Subscription) *types.Subscription {
-	emsSubscription := &types.Subscription{}
+	eventMeshSubscription := &types.Subscription{}
 
 	// Name
-	emsSubscription.Name = subscription.Name
-	emsSubscription.ContentMode = subscription.ContentMode
-	emsSubscription.ExemptHandshake = subscription.ExemptHandshake
+	eventMeshSubscription.Name = subscription.Name
+	eventMeshSubscription.ContentMode = subscription.ContentMode
+	eventMeshSubscription.ExemptHandshake = subscription.ExemptHandshake
 
 	// Qos
-	emsSubscription.Qos = subscription.Qos
+	eventMeshSubscription.Qos = subscription.Qos
 
 	// WebhookURL
-	emsSubscription.WebhookURL = subscription.WebhookURL
+	eventMeshSubscription.WebhookURL = subscription.WebhookURL
 
 	// Events
 	for _, e := range subscription.Events {
 		s := e.Source
 		t := e.Type
-		emsSubscription.Events = append(emsSubscription.Events, types.Event{Source: s, Type: t})
+		eventMeshSubscription.Events = append(eventMeshSubscription.Events, types.Event{Source: s, Type: t})
 	}
 
-	return emsSubscription
+	return eventMeshSubscription
+}
+
+func IsEventMeshSubModified(subscription *types.Subscription, hash int64) (bool, error) {
+	// generate has of new subscription
+	newHash, err := GetHash(subscription)
+	if err != nil {
+		return false, err
+	}
+
+	// compare hashes
+	return newHash != hash, nil
 }
 
 // GetRandString returns a random string of the given length.
@@ -237,19 +260,19 @@ func GetRandString(l int) string {
 	return string(b)
 }
 
-func ResetStatusToDefaults(sub eventingv1alpha1.Subscription) *eventingv1alpha1.Subscription {
+func ResetStatusToDefaults(sub eventingv1alpha2.Subscription) *eventingv1alpha2.Subscription {
 	desiredSub := sub.DeepCopy()
-	desiredSub.Status = eventingv1alpha1.SubscriptionStatus{}
+	desiredSub.Status = eventingv1alpha2.SubscriptionStatus{}
 	return desiredSub
 }
 
-func SetStatusAsNotReady(sub eventingv1alpha1.Subscription) *eventingv1alpha1.Subscription {
+func SetStatusAsNotReady(sub eventingv1alpha2.Subscription) *eventingv1alpha2.Subscription {
 	desiredSub := sub.DeepCopy()
 	desiredSub.Status.Ready = false
 	return desiredSub
 }
 
-func UpdateSubscriptionStatus(ctx context.Context, dClient dynamic.Interface, sub *eventingv1alpha1.Subscription) error {
+func UpdateSubscriptionStatus(ctx context.Context, dClient dynamic.Interface, sub *eventingv1alpha2.Subscription) error {
 	unstructuredObj, err := toUnstructuredSub(sub)
 	if err != nil {
 		return errors.Wrap(err, "convert subscription to unstructured failed")
@@ -262,8 +285,8 @@ func UpdateSubscriptionStatus(ctx context.Context, dClient dynamic.Interface, su
 	return err
 }
 
-func ToSubscriptionList(unstructuredList *unstructured.UnstructuredList) (*eventingv1alpha1.SubscriptionList, error) {
-	subscriptionList := new(eventingv1alpha1.SubscriptionList)
+func ToSubscriptionList(unstructuredList *unstructured.UnstructuredList) (*eventingv1alpha2.SubscriptionList, error) {
+	subscriptionList := new(eventingv1alpha2.SubscriptionList)
 	subscriptionListBytes, err := unstructuredList.MarshalJSON()
 	if err != nil {
 		return nil, err
@@ -275,7 +298,7 @@ func ToSubscriptionList(unstructuredList *unstructured.UnstructuredList) (*event
 	return subscriptionList, nil
 }
 
-func toUnstructuredSub(sub *eventingv1alpha1.Subscription) (*unstructured.Unstructured, error) {
+func toUnstructuredSub(sub *eventingv1alpha2.Subscription) (*unstructured.Unstructured, error) {
 	object, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(&sub)
 	if err != nil {
 		return nil, err
@@ -285,8 +308,8 @@ func toUnstructuredSub(sub *eventingv1alpha1.Subscription) (*unstructured.Unstru
 
 func SubscriptionGroupVersionResource() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
-		Version:  eventingv1alpha1.GroupVersion.Version,
-		Group:    eventingv1alpha1.GroupVersion.Group,
+		Version:  eventingv1alpha2.GroupVersion.Version,
+		Group:    eventingv1alpha2.GroupVersion.Group,
 		Resource: "subscriptions",
 	}
 }
