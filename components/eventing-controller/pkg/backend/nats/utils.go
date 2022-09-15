@@ -4,59 +4,80 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"strconv"
 	"strings"
 
 	cev2event "github.com/cloudevents/sdk-go/v2/event"
 	"github.com/nats-io/nats.go"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 
-	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
 	"github.com/kyma-project/kyma/components/eventing-controller/logger"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/application/applicationtest"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/application/fake"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/backend/eventtype"
 )
 
-// GetCleanSubjects returns a list of clean eventTypes from the unique filters in the subscription.
-func GetCleanSubjects(sub *eventingv1alpha1.Subscription, cleaner eventtype.Cleaner) ([]string, error) {
-	var filters []*eventingv1alpha1.BEBFilter
-	if sub.Spec.Filter != nil {
-		uniqueFilters, err := sub.Spec.Filter.Deduplicate()
-		if err != nil {
-			return []string{}, errors.Wrap(err, "deduplicate subscription filters failed")
+func getUniqueEventTypes(eventTypes []string) []string {
+	unique := make([]string, 0, len(eventTypes))
+	mapper := make(map[string]bool)
+
+	for _, val := range eventTypes {
+		if _, ok := mapper[val]; !ok {
+			mapper[val] = true
+			unique = append(unique, val)
 		}
-		filters = uniqueFilters.Filters
 	}
 
-	var cleanSubjects []string
-	for _, filter := range filters {
-		subject, err := GetCleanSubject(filter, cleaner)
-		if err != nil {
-			return []string{}, err
-		}
-		cleanSubjects = append(cleanSubjects, subject)
+	return unique
+}
+
+func GetCleanedTypes(subscriptionStatus eventingv1alpha2.SubscriptionStatus) []string {
+	var cleantypes []string
+	for _, eventtypes := range subscriptionStatus.Types {
+		cleantypes = append(cleantypes, eventtypes.CleanType)
 	}
-	return cleanSubjects, nil
+	return cleantypes
+}
+
+// GetCleanSubjects returns a list of clean eventTypes from the unique types in the subscription.
+func GetCleanSubjects(sub *eventingv1alpha2.Subscription, cleaner eventtype.Cleaner) ([]eventingv1alpha2.EventType, error) {
+	// TODO: Put this in the validation webhook
+	//if sub.Spec.Types == nil || sub.Spec.Source == "" {
+	//	return []eventingv1alpha2.EventType{}, errors.New("Source and Types must be provided")
+	//}
+
+	uniqueTypes := getUniqueEventTypes(sub.Spec.Types)
+	var cleanEventTypes []eventingv1alpha2.EventType
+	for _, eventType := range uniqueTypes {
+		cleanType, err := GetCleanSubject(eventType, cleaner)
+		if err != nil {
+			return []eventingv1alpha2.EventType{}, err
+		}
+		newEventType := eventingv1alpha2.EventType{
+			OriginalType: eventType,
+			CleanType:    cleanType,
+		}
+		cleanEventTypes = append(cleanEventTypes, newEventType)
+	}
+	return cleanEventTypes, nil
 }
 
 func createKeySuffix(subject string, queueGoupInstanceNo int) string {
 	return subject + string(types.Separator) + strconv.Itoa(queueGoupInstanceNo)
 }
 
-func CreateKey(sub *eventingv1alpha1.Subscription, subject string, queueGoupInstanceNo int) string {
+func CreateKey(sub *eventingv1alpha2.Subscription, subject string, queueGoupInstanceNo int) string {
 	return fmt.Sprintf("%s.%s", CreateKeyPrefix(sub), createKeySuffix(subject, queueGoupInstanceNo))
 }
 
-func GetCleanSubject(filter *eventingv1alpha1.BEBFilter, cleaner eventtype.Cleaner) (string, error) {
-	eventType := strings.TrimSpace(filter.EventType.Value)
+func GetCleanSubject(eventType string, cleaner eventtype.Cleaner) (string, error) {
 	if len(eventType) == 0 {
 		return "", nats.ErrBadSubject
 	}
 	// clean the application name segment in the event-type from none-alphanumeric characters
 	// return it as a NATS subject
-	return cleaner.Clean(eventType)
+	return cleaner.CleanJetStreamEvents(eventType)
 }
 
 func CreateKymaSubscriptionNamespacedName(key string, sub Subscriber) types.NamespacedName {
@@ -68,7 +89,7 @@ func CreateKymaSubscriptionNamespacedName(key string, sub Subscriber) types.Name
 }
 
 // IsNatsSubAssociatedWithKymaSub checks if the NATS subscription is associated / related to Kyma subscription or not.
-func IsNatsSubAssociatedWithKymaSub(natsSubKey string, natsSub Subscriber, sub *eventingv1alpha1.Subscription) bool {
+func IsNatsSubAssociatedWithKymaSub(natsSubKey string, natsSub Subscriber, sub *eventingv1alpha2.Subscription) bool {
 	return CreateKeyPrefix(sub) == CreateKymaSubscriptionNamespacedName(natsSubKey, natsSub).String()
 }
 
@@ -84,7 +105,7 @@ func ConvertMsgToCE(msg *nats.Msg) (*cev2event.Event, error) {
 	return &event, nil
 }
 
-func CreateKeyPrefix(sub *eventingv1alpha1.Subscription) string {
+func CreateKeyPrefix(sub *eventingv1alpha2.Subscription) string {
 	namespacedName := types.NamespacedName{
 		Namespace: sub.Namespace,
 		Name:      sub.Name,

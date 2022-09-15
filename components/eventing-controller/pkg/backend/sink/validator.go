@@ -2,6 +2,7 @@ package sink
 
 import (
 	"context"
+	"github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"net/url"
 	"strings"
 
@@ -12,7 +13,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
 	"github.com/kyma-project/kyma/components/eventing-controller/controllers/events"
 	"github.com/kyma-project/kyma/components/eventing-controller/logger"
 )
@@ -23,13 +23,13 @@ const (
 )
 
 type Validator interface {
-	Validate(subscription *v1alpha1.Subscription) error
+	Validate(subscription *v1alpha2.Subscription) error
 }
 
 // ValidatorFunc implements the Validator interface.
-type ValidatorFunc func(*v1alpha1.Subscription) error
+type ValidatorFunc func(*v1alpha2.Subscription) error
 
-func (vf ValidatorFunc) Validate(sub *v1alpha1.Subscription) error {
+func (vf ValidatorFunc) Validate(sub *v1alpha2.Subscription) error {
 	return vf(sub)
 }
 
@@ -47,7 +47,7 @@ func NewValidator(ctx context.Context, client client.Client, recorder record.Eve
 	return &defaultSinkValidator{ctx: ctx, client: client, recorder: recorder, logger: logger}
 }
 
-func (s defaultSinkValidator) Validate(subscription *v1alpha1.Subscription) error {
+func (s defaultSinkValidator) Validate(subscription *v1alpha2.Subscription) error {
 	if !isValidScheme(subscription.Spec.Sink) {
 		events.Warn(s.recorder, subscription, events.ReasonValidationFailed, "Sink URL scheme should be HTTP or HTTPS: %s", subscription.Spec.Sink)
 		return xerrors.Errorf(MissingSchemeErrMsg)

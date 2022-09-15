@@ -20,12 +20,18 @@ var (
 
 type Cleaner interface {
 	Clean(eventType string) (string, error)
+
+	CleanJetStreamEvents(eventType string) (string, error)
 }
 
 // CleanerFunc implements the Cleaner interface.
 type CleanerFunc func(et string) (string, error)
 
 func (cf CleanerFunc) Clean(et string) (string, error) {
+	return cf(et)
+}
+
+func (cf CleanerFunc) CleanJetStreamEvents(et string) (string, error) {
 	return cf(et)
 }
 
@@ -70,6 +76,11 @@ func (c *cleaner) Clean(eventType string) (string, error) {
 	)
 
 	return eventTypeClean, nil
+}
+
+// TODO: implement this
+func (c *cleaner) CleanJetStreamEvents(eventType string) (string, error) {
+	return cleanEventType(eventType), nil
 }
 
 func (c *cleaner) namedLogger() *zap.SugaredLogger {
