@@ -137,7 +137,7 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 	}
 
 	// convert Kyma Sub to EventMesh sub
-	eventMeshSub, err := backendutils.GetInternalView4Ev2(subscription, typesInfo, apiRule, b.WebhookAuth, b.ProtocolSettings, b.Namespace, b.SubNameMapper)
+	eventMeshSub, err := backendutils.ConvertKymaSubToEventMeshSub(subscription, typesInfo, apiRule, b.WebhookAuth, b.ProtocolSettings, b.Namespace, b.SubNameMapper)
 	if err != nil {
 		log.Errorw("Failed to get Kyma subscription internal view", ErrorLogKey, err)
 		return false, err
@@ -209,6 +209,7 @@ func (b *BEB) SyncSubscription(subscription *eventingv1alpha2.Subscription, clea
 
 	// Update status.types
 	subscription.Status.Types = statusCleanEventTypes(typesInfo)
+	subscription.Status.Backend.Types = statusFinalEventTypes(typesInfo)
 
 	// Update status.backend.types
 	// @TODO: check where to put this information in status, the EventMesh subject
@@ -336,6 +337,14 @@ func statusCleanEventTypes(typeInfos []backendutils.EventTypeInfo) []eventingv1a
 		cleanEventTypes = append(cleanEventTypes, eventingv1alpha2.EventType{OriginalType: i.OriginalType, CleanType: i.CleanType})
 	}
 	return cleanEventTypes
+}
+
+func statusFinalEventTypes(typeInfos []backendutils.EventTypeInfo) []eventingv1alpha2.JetStreamTypes {
+	var finalEventTypes []eventingv1alpha2.JetStreamTypes
+	for _, i := range typeInfos {
+		finalEventTypes = append(finalEventTypes, eventingv1alpha2.JetStreamTypes{OriginalType: i.OriginalType, ConsumerName: i.ProcessedType})
+	}
+	return finalEventTypes
 }
 
 func (b *BEB) deleteSubscription(name string) error {

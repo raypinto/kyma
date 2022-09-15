@@ -10,9 +10,9 @@ import (
 	. "github.com/onsi/gomega"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	eventingv1alpha1 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha1"
+	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"github.com/kyma-project/kyma/components/eventing-controller/pkg/ems/api/events/types"
-	eventingtesting "github.com/kyma-project/kyma/components/eventing-controller/testing"
+	eventingtesting "github.com/kyma-project/kyma/components/eventing-controller/testingv2"
 	"github.com/kyma-project/kyma/components/eventing-controller/utils"
 )
 
@@ -25,8 +25,8 @@ func TestGetHash(t *testing.T) {
 	g.Expect(hash).To(BeNumerically(">", 0))
 }
 
-func TestGetInternalView4Ev2(t *testing.T) {
-	defaultProtocolSettings := &eventingv1alpha1.ProtocolSettings{
+func TestConvertKymaSubToEventMeshSub(t *testing.T) {
+	defaultProtocolSettings := &eventingv1alpha2.ProtocolSettings{
 		ContentMode: func() *string {
 			cm := types.ContentModeBinary
 			return &cm
@@ -52,6 +52,15 @@ func TestGetInternalView4Ev2(t *testing.T) {
 		Type:   eventingtesting.OrderCreatedEventType,
 	}}
 
+	// getProcessedEventTypes returns the processed types after cleaning and prefixing.
+	getTypeInfos := func(types []string) []EventTypeInfo {
+		result := make([]EventTypeInfo, 0, len(types))
+		for _, t := range types {
+			result = append(result, EventTypeInfo{OriginalType: t, CleanType: t, ProcessedType: t})
+		}
+		return result
+	}
+
 	defaultNamespace := "defaultNS"
 	svcName := "foo-svc"
 	host := "foo-host"
@@ -72,6 +81,8 @@ func TestGetInternalView4Ev2(t *testing.T) {
 			eventingtesting.WithAtLeastOnceQOS(),
 			eventingtesting.WithDefaultWebhookAuth(),
 		)
+
+		eventTypeInfos := getTypeInfos(subscription.Spec.Types)
 
 		// Values should be overridden by the given values in subscription
 		expectedWebhookAuth := &types.WebhookAuth{
@@ -95,7 +106,7 @@ func TestGetInternalView4Ev2(t *testing.T) {
 		)
 
 		// then
-		gotBEBSubscription, err := GetInternalView4Ev2(subscription, apiRule, defaultWebhookAuth, defaultProtocolSettings, "", defaultNameMapper)
+		gotBEBSubscription, err := ConvertKymaSubToEventMeshSub(subscription, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, "", defaultNameMapper)
 
 		// when
 		g.Expect(err).To(BeNil())
@@ -108,6 +119,8 @@ func TestGetInternalView4Ev2(t *testing.T) {
 			eventingtesting.WithOrderCreatedFilter(),
 			eventingtesting.WithValidSink("ns", svcName),
 		)
+
+		eventTypeInfos := getTypeInfos(subscription.Spec.Types)
 
 		expectedBEBSubWithDefault := eventingtesting.NewBEBSubscription(
 			defaultNameMapper.MapSubscriptionName(subscription),
@@ -123,7 +136,7 @@ func TestGetInternalView4Ev2(t *testing.T) {
 		)
 
 		// then
-		gotBEBSubscription, err := GetInternalView4Ev2(subscription, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
+		gotBEBSubscription, err := ConvertKymaSubToEventMeshSub(subscription, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
 
 		// when
 		g.Expect(err).To(BeNil())
@@ -165,7 +178,8 @@ func TestGetInternalView4Ev2(t *testing.T) {
 		)
 
 		// then
-		gotBEBSubscription, err := GetInternalView4Ev2(subWithGivenWebhookAuth, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
+		eventTypeInfos := getTypeInfos(subWithGivenWebhookAuth.Spec.Types)
+		gotBEBSubscription, err := ConvertKymaSubToEventMeshSub(subWithGivenWebhookAuth, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
 
 		// when
 		g.Expect(err).To(BeNil())
@@ -192,7 +206,7 @@ func TestGetInternalView4Ev2(t *testing.T) {
 		)
 
 		// then
-		gotBEBSubWithDefaultCfg, err := GetInternalView4Ev2(subscriptionWithoutWebhookAuth, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
+		gotBEBSubWithDefaultCfg, err := ConvertKymaSubToEventMeshSub(subscriptionWithoutWebhookAuth, eventTypeInfos, apiRule, defaultWebhookAuth, defaultProtocolSettings, defaultNamespace, defaultNameMapper)
 
 		// when
 		g.Expect(err).To(BeNil())
@@ -256,38 +270,38 @@ func TestGetRandSuffix(t *testing.T) {
 func TestBEBSubscriptionNameMapper(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	s1 := &eventingv1alpha1.Subscription{
+	s1 := &eventingv1alpha2.Subscription{
 		ObjectMeta: v1meta.ObjectMeta{
 			Name:      "subscription1",
 			Namespace: "my-namespace",
 		},
 	}
-	s2 := &eventingv1alpha1.Subscription{
+	s2 := &eventingv1alpha2.Subscription{
 		ObjectMeta: v1meta.ObjectMeta{
 			Name:      "mysub",
 			Namespace: "another-namespace",
 		},
 	}
 
-	s3 := &eventingv1alpha1.Subscription{
+	s3 := &eventingv1alpha2.Subscription{
 		ObjectMeta: v1meta.ObjectMeta{
 			Name:      "name1",
 			Namespace: "name2",
 		},
-		Spec: eventingv1alpha1.SubscriptionSpec{
+		Spec: eventingv1alpha2.SubscriptionSpec{
 			Sink: "sub3-sink",
 		},
 	}
-	s4 := &eventingv1alpha1.Subscription{
+	s4 := &eventingv1alpha2.Subscription{
 		ObjectMeta: v1meta.ObjectMeta{
 			Name:      "name1",
 			Namespace: "name2",
 		},
-		Spec: eventingv1alpha1.SubscriptionSpec{
+		Spec: eventingv1alpha2.SubscriptionSpec{
 			Sink: "sub4-sink",
 		},
 	}
-	s5 := &eventingv1alpha1.Subscription{
+	s5 := &eventingv1alpha2.Subscription{
 		ObjectMeta: v1meta.ObjectMeta{
 			Name:      "name2",
 			Namespace: "name1",
@@ -302,7 +316,7 @@ func TestBEBSubscriptionNameMapper(t *testing.T) {
 	tests := []struct {
 		domainName string
 		maxLen     int
-		inputSub   *eventingv1alpha1.Subscription
+		inputSub   *eventingv1alpha2.Subscription
 		outputHash string
 	}{
 		{

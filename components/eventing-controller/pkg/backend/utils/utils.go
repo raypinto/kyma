@@ -117,7 +117,7 @@ func getQos(qosStr string) (types.Qos, error) {
 	}
 }
 
-func GetInternalView4Ev2(subscription *eventingv1alpha2.Subscription, typeInfos []EventTypeInfo, apiRule *apigatewayv1beta1.APIRule,
+func ConvertKymaSubToEventMeshSub(subscription *eventingv1alpha2.Subscription, typeInfos []EventTypeInfo, apiRule *apigatewayv1beta1.APIRule,
 	defaultWebhookAuth *types.WebhookAuth, defaultProtocolSettings *eventingv1alpha2.ProtocolSettings,
 	defaultNamespace string, nameMapper NameMapper) (*types.Subscription, error) {
 
