@@ -2,8 +2,11 @@ package v1alpha2
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/kyma-project/kyma/components/eventing-controller/pkg/env"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -169,6 +172,16 @@ func (s *Subscription) ToUnstructuredSub() (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: object}, nil
+}
+
+// UpdateSubConfig updates the config with defaults if an invalid value was provided
+// and  returns true if the subscription config was changed.
+func (s *Subscription) UpdateSubConfig(defaults *env.DefaultSubscriptionConfig) bool {
+	if _, err := s.GetMaxInFlightMessages(); err != nil {
+		return false
+	}
+	s.Spec.Config[MaxInFlightMessages] = fmt.Sprint(defaults.MaxInFlightMessages)
+	return true
 }
 
 //+kubebuilder:object:root=true

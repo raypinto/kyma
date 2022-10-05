@@ -121,8 +121,8 @@ func getUniqueEventTypes(eventTypes []string) []string {
 	return unique
 }
 
-// getCleanEventTypes returns a list of clean eventTypes from the unique types in the subscription.
-func getCleanEventTypes(sub *eventingv1alpha2.Subscription, cleaner cleaner.Cleaner) ([]eventingv1alpha2.EventType, error) {
+// GetCleanEventTypes returns a list of clean eventTypes from the unique types in the subscription.
+func GetCleanEventTypes(sub *eventingv1alpha2.Subscription, cleaner cleaner.Cleaner) ([]eventingv1alpha2.EventType, error) {
 	// TODO: Put this in the validation webhook
 	if sub.Spec.Types == nil {
 		return []eventingv1alpha2.EventType{}, errors.New("event types must be provided")

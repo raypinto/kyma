@@ -273,7 +273,7 @@ func TestGetCleanEventTypes(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			eventTypes, err := getCleanEventTypes(tc.givenSubscription, jscleaner)
+			eventTypes, err := GetCleanEventTypes(tc.givenSubscription, jscleaner)
 			require.Equal(t, tc.wantError, err != nil)
 			require.Equal(t, tc.wantEventTypes, eventTypes)
 		})

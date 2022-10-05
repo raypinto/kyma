@@ -85,7 +85,7 @@ func sendCloudEventToJetStream(jetStreamClient *JetStream, subject, eventData, c
 }
 
 func AddJSCleanEventTypesToStatus(sub *v1alpha2.Subscription, cleaner cleaner.Cleaner) error {
-	cleanEventType, err := getCleanEventTypes(sub, cleaner)
+	cleanEventType, err := GetCleanEventTypes(sub, cleaner)
 	if err != nil {
 		return err
 	}
