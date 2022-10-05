@@ -2,7 +2,6 @@ package v1alpha2
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -89,12 +88,12 @@ func (s Subscription) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-func (s *Subscription) GetMaxInFlightMessages() (*int, error) {
+func (s *Subscription) GetMaxInFlightMessages(defaults *env.DefaultSubscriptionConfig) int {
 	val, err := strconv.Atoi(s.Spec.Config[MaxInFlightMessages])
 	if err != nil {
-		return nil, err
+		return defaults.MaxInFlightMessages
 	}
-	return &val, nil
+	return val
 }
 
 // InitializeEventTypes initializes the SubscriptionStatus.Types with an empty slice of EventType.
@@ -172,16 +171,6 @@ func (s *Subscription) ToUnstructuredSub() (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: object}, nil
-}
-
-// UpdateSubConfig updates the config with defaults if an invalid value was provided
-// and  returns true if the subscription config was changed.
-func (s *Subscription) UpdateSubConfig(defaults *env.DefaultSubscriptionConfig) bool {
-	if _, err := s.GetMaxInFlightMessages(); err != nil {
-		return false
-	}
-	s.Spec.Config[MaxInFlightMessages] = fmt.Sprint(defaults.MaxInFlightMessages)
-	return true
 }
 
 //+kubebuilder:object:root=true

@@ -26,11 +26,10 @@ import (
 	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
 	"github.com/kyma-project/kyma/components/eventing-controller/logger"
 	jetstream "github.com/kyma-project/kyma/components/eventing-controller/pkg/backend/jetstreamv2"
-	"github.com/kyma-project/kyma/components/eventing-controller/pkg/env"
 )
 
 const (
-	reconcilerName  = "jetstream-subscription-reconciler"
+	reconcilerName  = "jetstream-subscription-v2-reconciler"
 	requeueDuration = 10 * time.Second
 )
 
@@ -41,13 +40,12 @@ type Reconciler struct {
 	recorder            record.EventRecorder
 	logger              *logger.Logger
 	cleaner             cleaner.Cleaner
-	subsConfig          env.DefaultSubscriptionConfig
 	sinkValidator       sinkv2.Validator
 	customEventsChannel chan event.GenericEvent
 }
 
 func NewReconciler(ctx context.Context, client client.Client, jsHandler jetstream.Backend, logger *logger.Logger,
-	recorder record.EventRecorder, cleaner cleaner.Cleaner, subsCfg env.DefaultSubscriptionConfig, defaultSinkValidator sinkv2.Validator) *Reconciler {
+	recorder record.EventRecorder, cleaner cleaner.Cleaner, defaultSinkValidator sinkv2.Validator) *Reconciler {
 	reconciler := &Reconciler{
 		Client:              client,
 		ctx:                 ctx,
@@ -55,7 +53,6 @@ func NewReconciler(ctx context.Context, client client.Client, jsHandler jetstrea
 		recorder:            recorder,
 		logger:              logger,
 		cleaner:             cleaner,
-		subsConfig:          subsCfg,
 		sinkValidator:       defaultSinkValidator,
 		customEventsChannel: make(chan event.GenericEvent),
 	}
@@ -97,11 +94,9 @@ func (r *Reconciler) SetupUnmanaged(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=eventing.kyma-project.io,resources=subscriptions/status,verbs=get;update;patch
 // Generate required RBAC to emit kubernetes events in the controller.
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// Generated required RBAC to list Applications (required by event type cleaner).
-// +kubebuilder:rbac:groups="applicationconnector.kyma-project.io",resources=applications,verbs=get;list;watch
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.namedLogger().Debugw("Received subscription reconciliation request", "namespace", req.Namespace, "name", req.Name)
+	r.namedLogger().Debugw("Received subscription v1alpha2 reconciliation request", "namespace", req.Namespace, "name", req.Name)
 
 	actualSubscription := &eventingv1alpha2.Subscription{}
 	// Ensure the object was not deleted in the meantime
@@ -272,8 +267,6 @@ func (r *Reconciler) syncInitialStatus(subscription *eventingv1alpha2.Subscripti
 		subscription.Status.Types = cleanedTypes
 		statusChanged = true
 	}
-	// TODO: move this to defaulting webhook
-	statusChanged = subscription.UpdateSubConfig(&r.subsConfig) || statusChanged
 	return statusChanged, nil
 }
 

@@ -36,13 +36,14 @@ const (
 	jsConsumerAcKWait                  = 30 * time.Second
 )
 
-func NewJetStream(config env.NatsConfig, metricsCollector *backendmetrics.Collector, cleaner cleaner.Cleaner, logger *logger.Logger) *JetStream {
+func NewJetStream(config env.NatsConfig, metricsCollector *backendmetrics.Collector, cleaner cleaner.Cleaner, logger *logger.Logger, subsConfig env.DefaultSubscriptionConfig) *JetStream {
 	return &JetStream{
 		Config:           config,
 		logger:           logger,
 		subscriptions:    make(map[SubscriptionSubjectIdentifier]Subscriber),
 		metricsCollector: metricsCollector,
 		cleaner:          cleaner,
+		subsConfig:       subsConfig,
 	}
 }
 
@@ -425,10 +426,6 @@ func (js *JetStream) bindConsumersForInvalidNATSSubscriptions(subscription *even
 // createConsumer creates a new consumer on NATS for each CleanEventType,
 // when there is no NATS subscription associated with the CleanEventType.
 func (js *JetStream) createConsumer(subscription *eventingv1alpha2.Subscription, asyncCallback func(m *nats.Msg), log *zap.SugaredLogger) error {
-	maxInFlight, err := subscription.GetMaxInFlightMessages()
-	if err != nil {
-		return err
-	}
 	for _, subject := range subscription.Status.Types {
 		jsSubject := js.getJetStreamSubject(subscription.Spec.Source, subject.CleanType, subscription.Spec.TypeMatching)
 		jsSubKey := NewSubscriptionSubjectIdentifier(subscription, jsSubject)
@@ -453,7 +450,7 @@ func (js *JetStream) createConsumer(subscription *eventingv1alpha2.Subscription,
 		jsSubscription, err := js.jsCtx.Subscribe(
 			jsSubject,
 			asyncCallback,
-			js.getDefaultSubscriptionOptions(jsSubKey, *maxInFlight)...,
+			js.getDefaultSubscriptionOptions(jsSubKey, subscription.GetMaxInFlightMessages(&js.subsConfig))...,
 		)
 		if err != nil {
 			return xerrors.Errorf("failed to subscribe on JetStream: %v", err)
