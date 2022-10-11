@@ -70,6 +70,11 @@ func (js *JetStream) SyncSubscription(subscription *eventingv1alpha2.Subscriptio
 		return err
 	}
 
+	// TODO: move this to the validation webhook
+	if subscription.Spec.Source == "" {
+		return xerrors.Errorf("source value cannot be empty")
+	}
+
 	if err := js.syncSubscriptionTypes(subscription, log); err != nil {
 		return err
 	}
@@ -287,7 +292,7 @@ func (js *JetStream) syncSubscriptionType(key SubscriptionSubjectIdentifier, sub
 }
 
 func (js *JetStream) cleanupUnnecessaryJetStreamSubscribers(jsSub Subscriber, subscription *eventingv1alpha2.Subscription, log *zap.SugaredLogger, info *nats.ConsumerInfo, key SubscriptionSubjectIdentifier) error {
-	if utils.ContainsString(js.GetJetStreamSubjects(subscription.Spec.Source, getCleanEventTypesFromStatus(subscription.Status), subscription.Spec.TypeMatching), info.Config.FilterSubject) {
+	if utils.ContainsString(js.GetJetStreamSubjects(subscription.Spec.Source, GetCleanEventTypesFromEventTypes(subscription.Status.Types), subscription.Spec.TypeMatching), info.Config.FilterSubject) {
 		return nil
 	}
 	log.Infow(
