@@ -2,6 +2,8 @@ package jetstream
 
 import (
 	"context"
+	"fmt"
+	"github.com/pkg/errors"
 	"reflect"
 	"time"
 
@@ -32,6 +34,8 @@ const (
 	reconcilerName  = "jetstream-subscription-v2-reconciler"
 	requeueDuration = 10 * time.Second
 )
+
+var ErrFailedToDeleteSub = errors.New("failed to delete JetStream subscription")
 
 type Reconciler struct {
 	client.Client
@@ -230,7 +234,7 @@ func (r *Reconciler) handleSubscriptionDeletion(ctx context.Context, subscriptio
 		if err := r.Backend.DeleteSubscription(subscription); err != nil {
 			// if failed to delete the external dependency here, return with error
 			// so that it can be retried
-			return xerrors.Errorf("failed to delete JetStream subscription: %v", err)
+			return fmt.Errorf("%w: %v", ErrFailedToDeleteSub, err)
 		}
 
 		// remove our finalizer from the list and update it.

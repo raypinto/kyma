@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -126,7 +125,7 @@ func Test_Reconcile(t *testing.T) {
 				return NewReconciler(ctx, te.Client, te.Backend, te.Logger, te.Recorder, te.Cleaner, happyValidator)
 			},
 			wantReconcileResult: ctrl.Result{},
-			wantReconcileError:  xerrors.Errorf("failed to delete JetStream subscription: %v", backendDeleteErr),
+			wantReconcileError:  ErrFailedToDeleteSub,
 		},
 		{
 			name:              "Return error and default Result{} when validator returns error",
@@ -153,11 +152,7 @@ func Test_Reconcile(t *testing.T) {
 			}}
 			res, err := reconciler.Reconcile(context.Background(), r)
 			req.Equal(res, tc.wantReconcileResult)
-			if tc.wantReconcileError == nil {
-				req.Equal(err, nil)
-			} else {
-				req.Equal(err.Error(), tc.wantReconcileError.Error())
-			}
+			req.ErrorIs(err, tc.wantReconcileError)
 		})
 	}
 }
