@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	kymalogger "github.com/kyma-project/kyma/common/logging/logger"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	eventingv1alpha2 "github.com/kyma-project/kyma/components/eventing-controller/api/v1alpha2"
-	"github.com/kyma-project/kyma/components/eventing-controller/logger"
 	controllertesting "github.com/kyma-project/kyma/components/eventing-controller/testing/v2"
 )
 
@@ -24,9 +22,7 @@ func TestSinkValidator(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	ctx := context.Background()
 	recorder := &record.FakeRecorder{}
-	defaultLogger, err := logger.New(string(kymalogger.JSON), string(kymalogger.INFO))
-	require.NoError(t, err)
-	sinkValidator := NewValidator(ctx, fakeClient, recorder, defaultLogger)
+	sinkValidator := NewValidator(ctx, fakeClient, recorder)
 
 	testCases := []struct {
 		name                  string
